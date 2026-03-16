@@ -1,0 +1,42 @@
+# Path to TaDiff-style preprocessed Sailor .npy files.
+# Expected files per patient: sub-XX_{image,label,days,treatment}.npy
+data_root: /content/drive/MyDrive/sailor_preprocessed
+
+# Where run outputs (fits, metrics, logs) should be written.
+output_root: /Users/rohitkhanna/Desktop/ORIE Spring 2026/Tumor_Growth_Project/TaDiff/tumor-biophysical-parameter-inference/outputs/pilot_run_001
+
+# Optional explicit TumorGrowthToolkit path.
+# Leave null to use automatic lookup (<repo_parent>/TumorGrowthToolkit).
+tgtk_root: null
+
+patient_ids:
+  - sub-01
+  - sub-02
+
+fit_sessions: 3
+eval_horizons: [1, 2]
+resolution_factor: 0.5
+n_starts: 20
+top_n: 5
+seed: 42
+
+solver_name: FK
+mask_threshold: 0.25
+brain_threshold: 1.0e-6
+failure_loss: 2.0
+
+param_bounds:
+  Dw: [0.02, 1.50]
+  rho: [0.001, 0.25]
+  NxT1_pct: [0.20, 0.80]
+  NyT1_pct: [0.20, 0.80]
+  NzT1_pct: [0.20, 0.80]
+
+solver_static_params:
+  RatioDw_Dg: 10.0
+  th_matter: 0.1
+  dx_mm: 1.0
+  dy_mm: 1.0
+  dz_mm: 1.0
+  init_scale: 1.0
+  verbose: false

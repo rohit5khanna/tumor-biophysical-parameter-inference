@@ -1,0 +1,6 @@
+# Example path overrides for Colab + Google Drive.
+# Copy values into configs/pilot.yaml (or create another config file).
+
+data_root: /content/drive/MyDrive/sailor_preprocessed
+output_root: /content/drive/MyDrive/tumor_pde_outputs/pilot_run_001
+tgtk_root: /content/TumorGrowthToolkit
