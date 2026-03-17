@@ -31,3 +31,7 @@ Outputs go to:
 - `outputs/.../fits`
 - `outputs/.../metrics`
 - `outputs/.../figures` (GT vs PDE vs LOCF visual comparisons)
+
+Notes:
+- Fit-window diagnostics are also saved as figures (`*_fit_session_*.png`).
+- You can run threshold sweeps with `mask_threshold_sweep` in config.

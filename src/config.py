@@ -44,8 +44,10 @@ class ExperimentConfig:
     seed: int = 42
 
     mask_threshold: float = 0.25
+    mask_threshold_sweep: List[float] = field(default_factory=list)
     brain_threshold: float = 1e-6
     failure_loss: float = 2.0
+    seed_jitter_pct: float = 0.12
 
     param_bounds: Dict[str, List[float]] = field(default_factory=lambda: dict(DEFAULT_PARAM_BOUNDS))
     solver_static_params: Dict[str, Any] = field(default_factory=lambda: dict(DEFAULT_SOLVER_STATIC_PARAMS))
@@ -65,6 +67,12 @@ class ExperimentConfig:
             raise ValueError("resolution_factor must be > 0.")
         if self.mask_threshold <= 0 or self.mask_threshold >= 1:
             raise ValueError("mask_threshold should be in (0, 1).")
+        if self.mask_threshold_sweep:
+            for t in self.mask_threshold_sweep:
+                if t <= 0 or t >= 1:
+                    raise ValueError("mask_threshold_sweep values should be in (0, 1).")
+        if self.seed_jitter_pct <= 0:
+            raise ValueError("seed_jitter_pct must be > 0.")
         if not self.eval_horizons:
             raise ValueError("eval_horizons cannot be empty.")
         if any(h < 1 for h in self.eval_horizons):
@@ -120,8 +128,10 @@ def load_config(path: Union[str, Path]) -> ExperimentConfig:
         top_n=int(raw.get("top_n", 5)),
         seed=int(raw.get("seed", 42)),
         mask_threshold=float(raw.get("mask_threshold", 0.25)),
+        mask_threshold_sweep=list(raw.get("mask_threshold_sweep", [])),
         brain_threshold=float(raw.get("brain_threshold", 1e-6)),
         failure_loss=float(raw.get("failure_loss", 2.0)),
+        seed_jitter_pct=float(raw.get("seed_jitter_pct", 0.12)),
         param_bounds=param_bounds,
         solver_static_params=solver_static_params,
     )

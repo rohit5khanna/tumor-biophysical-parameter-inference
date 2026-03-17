@@ -15,7 +15,7 @@ from .fit import fit_patient_random_search
 from .paths import prepare_output_dirs
 from .solver_wrapper_tgtk import TGTKSimulator
 from .splits import make_temporal_split
-from .visualize import save_patient_eval_figures
+from .visualize import save_patient_eval_figures, save_patient_fit_figures
 
 
 def _to_jsonable(obj: Any) -> Any:
@@ -57,8 +57,6 @@ def main() -> None:
     args = parser.parse_args()
 
     cfg = load_config(args.config)
-    out = prepare_output_dirs(cfg.output_root)
-
     print("[INFO] Loaded config")
     print(f"  data_root: {cfg.data_root}")
     print(f"  output_root: {cfg.output_root}")
@@ -66,52 +64,68 @@ def main() -> None:
     print(f"  patients: {cfg.patient_ids}")
 
     np.random.seed(cfg.seed)
-    simulator = TGTKSimulator(
-        solver_name=cfg.solver_name,
-        tgtk_root=cfg.tgtk_root,
-        resolution_factor=cfg.resolution_factor,
-        brain_threshold=cfg.brain_threshold,
-        mask_threshold=cfg.mask_threshold,
-        solver_static_params=cfg.solver_static_params,
-    )
     patients = load_many_patients(cfg.data_root, cfg.patient_ids)
 
-    summary_rows = []
+    thresholds = cfg.mask_threshold_sweep if cfg.mask_threshold_sweep else [cfg.mask_threshold]
+    sweep_rows = []
 
-    for bundle in patients:
-        pid = bundle["patient_id"]
-        n_sessions = bundle["label"].shape[0]
-        print(f"[INFO] Patient {pid} | sessions={n_sessions}")
+    for thr in thresholds:
+        thr_tag = f"thr_{thr:.2f}".replace(".", "p")
+        run_root = cfg.output_root if len(thresholds) == 1 else (cfg.output_root / thr_tag)
+        out = prepare_output_dirs(run_root)
 
-        split = make_temporal_split(
-            n_sessions=n_sessions,
-            fit_sessions=cfg.fit_sessions,
-            eval_horizons=cfg.eval_horizons,
+        print(f"[INFO] Running threshold={thr:.3f} -> output={run_root}")
+        simulator = TGTKSimulator(
+            solver_name=cfg.solver_name,
+            tgtk_root=cfg.tgtk_root,
+            resolution_factor=cfg.resolution_factor,
+            brain_threshold=cfg.brain_threshold,
+            mask_threshold=thr,
+            solver_static_params=cfg.solver_static_params,
         )
 
-        fit_result = fit_patient_random_search(
-            simulator=simulator,
-            bundle=bundle,
-            split=split,
-            bounds=cfg.param_bounds,
-            n_starts=cfg.n_starts,
-            top_n=cfg.top_n,
-            seed=cfg.seed,
-            failure_loss=cfg.failure_loss,
-        )
-        eval_result = evaluate_patient(
-            bundle=bundle,
-            split=split,
-            fit_result=fit_result,
-            simulator=simulator,
-        )
-        save_patient_eval_figures(bundle=bundle, eval_result=eval_result, figures_dir=Path(out["figures"]))
+        summary_rows = []
+        for bundle in patients:
+            pid = bundle["patient_id"]
+            n_sessions = bundle["label"].shape[0]
+            print(f"[INFO] Patient {pid} | sessions={n_sessions} | thr={thr:.3f}")
 
-        _save_json(Path(out["fits"]) / f"{pid}_fit.json", fit_result)
-        _save_json(Path(out["metrics"]) / f"{pid}_metrics.json", eval_result)
+            split = make_temporal_split(
+                n_sessions=n_sessions,
+                fit_sessions=cfg.fit_sessions,
+                eval_horizons=cfg.eval_horizons,
+            )
 
-        summary_rows.append(
-            {
+            fit_result = fit_patient_random_search(
+                simulator=simulator,
+                bundle=bundle,
+                split=split,
+                bounds=cfg.param_bounds,
+                n_starts=cfg.n_starts,
+                top_n=cfg.top_n,
+                seed=cfg.seed,
+                failure_loss=cfg.failure_loss,
+                seed_jitter_pct=cfg.seed_jitter_pct,
+            )
+            eval_result = evaluate_patient(
+                bundle=bundle,
+                split=split,
+                fit_result=fit_result,
+                simulator=simulator,
+            )
+            save_patient_fit_figures(
+                bundle=bundle,
+                fit_result=fit_result,
+                simulator=simulator,
+                figures_dir=Path(out["figures"]),
+            )
+            save_patient_eval_figures(bundle=bundle, eval_result=eval_result, figures_dir=Path(out["figures"]))
+
+            _save_json(Path(out["fits"]) / f"{pid}_fit.json", fit_result)
+            _save_json(Path(out["metrics"]) / f"{pid}_metrics.json", eval_result)
+
+            row = {
+                "mask_threshold": thr,
                 "patient_id": pid,
                 "fit_best_loss": eval_result["fit_best_loss"],
                 "fit_best_mean_dice": eval_result["fit_best_mean_dice"],
@@ -120,17 +134,27 @@ def main() -> None:
                 "locf_eval_mean_dice": eval_result["locf_eval"]["mean_dice"],
                 "delta_best_vs_locf": eval_result["delta_best_vs_locf"],
             }
-        )
+            summary_rows.append(row)
+            sweep_rows.append(row)
 
-    summary_csv = Path(out["metrics"]) / "summary.csv"
-    if summary_rows:
-        with summary_csv.open("w", newline="", encoding="utf-8") as f:
-            writer = csv.DictWriter(f, fieldnames=list(summary_rows[0].keys()))
+        summary_csv = Path(out["metrics"]) / "summary.csv"
+        if summary_rows:
+            with summary_csv.open("w", newline="", encoding="utf-8") as f:
+                writer = csv.DictWriter(f, fieldnames=list(summary_rows[0].keys()))
+                writer.writeheader()
+                writer.writerows(summary_rows)
+        _save_json(Path(out["metrics"]) / "summary.json", {"rows": summary_rows})
+        print(f"[INFO] Done threshold={thr:.3f}. Summary: {summary_csv}")
+
+    if len(thresholds) > 1 and sweep_rows:
+        sweep_dir = prepare_output_dirs(cfg.output_root)
+        sweep_csv = Path(sweep_dir["metrics"]) / "summary_sweep.csv"
+        with sweep_csv.open("w", newline="", encoding="utf-8") as f:
+            writer = csv.DictWriter(f, fieldnames=list(sweep_rows[0].keys()))
             writer.writeheader()
-            writer.writerows(summary_rows)
-
-    _save_json(Path(out["metrics"]) / "summary.json", {"rows": summary_rows})
-    print(f"[INFO] Done. Summary written to: {summary_csv}")
+            writer.writerows(sweep_rows)
+        _save_json(Path(sweep_dir["metrics"]) / "summary_sweep.json", {"rows": sweep_rows})
+        print(f"[INFO] Sweep summary written to: {sweep_csv}")
 
 
 if __name__ == "__main__":

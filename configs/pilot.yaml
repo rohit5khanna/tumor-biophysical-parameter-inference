@@ -22,8 +22,12 @@ seed: 42
 
 solver_name: FK
 mask_threshold: 0.25
+# Optional sweep. If non-empty, the runner executes once per threshold
+# and writes outputs into threshold-specific subfolders.
+# mask_threshold_sweep: [0.05, 0.1, 0.2, 0.3]
 brain_threshold: 1.0e-6
 failure_loss: 2.0
+seed_jitter_pct: 0.12
 
 param_bounds:
   Dw: [0.02, 1.50]

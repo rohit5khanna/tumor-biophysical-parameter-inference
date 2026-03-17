@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Dict
+from typing import Dict, List
 
 import matplotlib.pyplot as plt
 import numpy as np
+
+from .metrics import hard_dice
 
 
 def _normalize_for_display(volume_3d: np.ndarray) -> np.ndarray:
@@ -114,5 +116,98 @@ def save_patient_eval_figures(bundle: Dict, eval_result: Dict, figures_dir: Path
 
         fig.tight_layout()
         save_path = figures_dir / f"{pid}_session_{sess_idx:02d}.png"
+        fig.savefig(save_path, dpi=140, bbox_inches="tight")
+        plt.close(fig)
+
+
+def save_patient_fit_figures(bundle: Dict, fit_result: Dict, simulator, figures_dir: Path) -> None:
+    """
+    Save fit-window diagnostics for best theta:
+      - GT
+      - Best PDE vs GT
+      - baseline (session 0) vs GT
+      - FP/FN for best prediction
+    """
+    figures_dir.mkdir(parents=True, exist_ok=True)
+    split = fit_result["split"]
+    baseline_idx = split["baseline_idx"]
+    target_indices: List[int] = split["fit_target_indices"]
+    if not target_indices:
+        return
+
+    theta = fit_result["best"]["theta"]
+    sim = simulator.predict_for_indices(
+        bundle=bundle,
+        theta=theta,
+        target_indices=target_indices,
+        baseline_idx=baseline_idx,
+    )
+
+    pid = bundle["patient_id"]
+    gt_all = bundle["label_bin"]
+    image_by_session = bundle.get("image_by_session", None)
+    baseline_mask = gt_all[baseline_idx].astype(np.uint8)
+
+    for i, sess_idx in enumerate(target_indices):
+        gt = gt_all[sess_idx].astype(np.uint8)
+        pred_best = sim["pred_masks"][i].astype(np.uint8) if sim["success_flags"][i] else np.zeros_like(gt)
+        pred_base = baseline_mask
+
+        best_d = float(hard_dice(pred_best, gt))
+        base_d = float(hard_dice(pred_base, gt))
+
+        z = _best_slice_index(gt)
+        if image_by_session is not None:
+            bg = image_by_session[sess_idx, 0, :, :, :]
+            bg = _normalize_for_display(bg)[:, :, z]
+        else:
+            bg = gt[:, :, z].astype(np.float32)
+
+        gt2d = gt[:, :, z]
+        best2d = pred_best[:, :, z]
+        base2d = pred_base[:, :, z]
+        fp = np.logical_and(best2d > 0, gt2d == 0).astype(np.uint8)
+        fn = np.logical_and(best2d == 0, gt2d > 0).astype(np.uint8)
+
+        fig, axes = plt.subplots(1, 4, figsize=(16, 4))
+        fig.suptitle(
+            f"{pid} | FIT session {sess_idx} | best Dice={best_d:.3f} | baseline Dice={base_d:.3f}",
+            fontsize=11,
+        )
+
+        plt.sca(axes[0])
+        _overlay(bg, gt2d, color="r", alpha=0.45)
+        plt.title("GT mask")
+        plt.axis("off")
+
+        plt.sca(axes[1])
+        plt.imshow(bg, cmap="gray", vmin=0.0, vmax=1.0)
+        gtm = np.ma.masked_where(gt2d <= 0, gt2d)
+        prm = np.ma.masked_where(best2d <= 0, best2d)
+        plt.imshow(gtm, cmap="Reds", alpha=0.35, vmin=0, vmax=1)
+        plt.imshow(prm, cmap="Blues", alpha=0.35, vmin=0, vmax=1)
+        plt.title("Best PDE (blue) vs GT (red)")
+        plt.axis("off")
+
+        plt.sca(axes[2])
+        plt.imshow(bg, cmap="gray", vmin=0.0, vmax=1.0)
+        gtm = np.ma.masked_where(gt2d <= 0, gt2d)
+        bsm = np.ma.masked_where(base2d <= 0, base2d)
+        plt.imshow(gtm, cmap="Reds", alpha=0.35, vmin=0, vmax=1)
+        plt.imshow(bsm, cmap="Greens", alpha=0.35, vmin=0, vmax=1)
+        plt.title("Baseline session-0 (green) vs GT (red)")
+        plt.axis("off")
+
+        plt.sca(axes[3])
+        plt.imshow(bg, cmap="gray", vmin=0.0, vmax=1.0)
+        fpm = np.ma.masked_where(fp <= 0, fp)
+        fnm = np.ma.masked_where(fn <= 0, fn)
+        plt.imshow(fpm, cmap="Blues", alpha=0.45, vmin=0, vmax=1)
+        plt.imshow(fnm, cmap="Reds", alpha=0.45, vmin=0, vmax=1)
+        plt.title("Best errors: FP blue, FN red")
+        plt.axis("off")
+
+        fig.tight_layout()
+        save_path = figures_dir / f"{pid}_fit_session_{sess_idx:02d}.png"
         fig.savefig(save_path, dpi=140, bbox_inches="tight")
         plt.close(fig)
