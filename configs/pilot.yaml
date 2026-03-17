@@ -21,6 +21,8 @@ top_n: 5
 seed: 42
 
 solver_name: FK
+init_mode: gaussian   # gaussian | mask_field
+init_smoothing_sigma: 1.0
 mask_threshold: 0.25
 # Optional sweep. If non-empty, the runner executes once per threshold
 # and writes outputs into threshold-specific subfolders.

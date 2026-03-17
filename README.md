@@ -35,3 +35,6 @@ Outputs go to:
 Notes:
 - Fit-window diagnostics are also saved as figures (`*_fit_session_*.png`).
 - You can run threshold sweeps with `mask_threshold_sweep` in config.
+- You can switch initialization with `init_mode`:
+  - `gaussian` (default TumorGrowthToolkit behavior)
+  - `mask_field` (baseline mask-based initialization)

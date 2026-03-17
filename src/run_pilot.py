@@ -81,6 +81,8 @@ def main() -> None:
             resolution_factor=cfg.resolution_factor,
             brain_threshold=cfg.brain_threshold,
             mask_threshold=thr,
+            init_mode=cfg.init_mode,
+            init_smoothing_sigma=cfg.init_smoothing_sigma,
             solver_static_params=cfg.solver_static_params,
         )
 

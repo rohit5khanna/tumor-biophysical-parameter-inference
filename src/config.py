@@ -38,6 +38,8 @@ class ExperimentConfig:
     resolution_factor: float = 0.5
     solver_name: str = "FK"
     tgtk_root: Optional[Path] = None
+    init_mode: str = "gaussian"
+    init_smoothing_sigma: float = 1.0
 
     n_starts: int = 20
     top_n: int = 5
@@ -65,6 +67,10 @@ class ExperimentConfig:
             raise ValueError("top_n cannot be greater than n_starts.")
         if self.resolution_factor <= 0:
             raise ValueError("resolution_factor must be > 0.")
+        if self.init_mode not in {"gaussian", "mask_field"}:
+            raise ValueError("init_mode must be one of {'gaussian', 'mask_field'}.")
+        if self.init_smoothing_sigma < 0:
+            raise ValueError("init_smoothing_sigma must be >= 0.")
         if self.mask_threshold <= 0 or self.mask_threshold >= 1:
             raise ValueError("mask_threshold should be in (0, 1).")
         if self.mask_threshold_sweep:
@@ -124,6 +130,8 @@ def load_config(path: Union[str, Path]) -> ExperimentConfig:
         resolution_factor=float(raw.get("resolution_factor", 0.5)),
         solver_name=str(raw.get("solver_name", "FK")),
         tgtk_root=tgtk_root,
+        init_mode=str(raw.get("init_mode", "gaussian")),
+        init_smoothing_sigma=float(raw.get("init_smoothing_sigma", 1.0)),
         n_starts=int(raw.get("n_starts", 20)),
         top_n=int(raw.get("top_n", 5)),
         seed=int(raw.get("seed", 42)),
