@@ -30,6 +30,11 @@ mask_threshold: 0.25
 brain_threshold: 1.0e-6
 failure_loss: 2.0
 seed_jitter_pct: 0.12
+growth_gate_enabled: false
+growth_gate_dilation: 0
+growth_gate_apply_in_fit: true
+growth_gate_apply_in_eval: true
+growth_gate_outside_penalty: 0.0
 
 param_bounds:
   Dw: [0.02, 1.50]

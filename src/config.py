@@ -50,6 +50,11 @@ class ExperimentConfig:
     brain_threshold: float = 1e-6
     failure_loss: float = 2.0
     seed_jitter_pct: float = 0.12
+    growth_gate_enabled: bool = False
+    growth_gate_dilation: int = 0
+    growth_gate_apply_in_fit: bool = True
+    growth_gate_apply_in_eval: bool = True
+    growth_gate_outside_penalty: float = 0.0
 
     param_bounds: Dict[str, List[float]] = field(default_factory=lambda: dict(DEFAULT_PARAM_BOUNDS))
     solver_static_params: Dict[str, Any] = field(default_factory=lambda: dict(DEFAULT_SOLVER_STATIC_PARAMS))
@@ -79,6 +84,10 @@ class ExperimentConfig:
                     raise ValueError("mask_threshold_sweep values should be in (0, 1).")
         if self.seed_jitter_pct <= 0:
             raise ValueError("seed_jitter_pct must be > 0.")
+        if self.growth_gate_dilation < 0:
+            raise ValueError("growth_gate_dilation must be >= 0.")
+        if self.growth_gate_outside_penalty < 0:
+            raise ValueError("growth_gate_outside_penalty must be >= 0.")
         if not self.eval_horizons:
             raise ValueError("eval_horizons cannot be empty.")
         if any(h < 1 for h in self.eval_horizons):
@@ -140,6 +149,11 @@ def load_config(path: Union[str, Path]) -> ExperimentConfig:
         brain_threshold=float(raw.get("brain_threshold", 1e-6)),
         failure_loss=float(raw.get("failure_loss", 2.0)),
         seed_jitter_pct=float(raw.get("seed_jitter_pct", 0.12)),
+        growth_gate_enabled=bool(raw.get("growth_gate_enabled", False)),
+        growth_gate_dilation=int(raw.get("growth_gate_dilation", 0)),
+        growth_gate_apply_in_fit=bool(raw.get("growth_gate_apply_in_fit", True)),
+        growth_gate_apply_in_eval=bool(raw.get("growth_gate_apply_in_eval", True)),
+        growth_gate_outside_penalty=float(raw.get("growth_gate_outside_penalty", 0.0)),
         param_bounds=param_bounds,
         solver_static_params=solver_static_params,
     )

@@ -6,6 +6,7 @@ from typing import Dict, List
 import matplotlib.pyplot as plt
 import numpy as np
 
+from .growth_gate import apply_growth_gate_to_mask
 from .metrics import hard_dice
 
 
@@ -120,7 +121,14 @@ def save_patient_eval_figures(bundle: Dict, eval_result: Dict, figures_dir: Path
         plt.close(fig)
 
 
-def save_patient_fit_figures(bundle: Dict, fit_result: Dict, simulator, figures_dir: Path) -> None:
+def save_patient_fit_figures(
+    bundle: Dict,
+    fit_result: Dict,
+    simulator,
+    figures_dir: Path,
+    allowed_growth_mask: np.ndarray | None = None,
+    apply_growth_gate: bool = False,
+) -> None:
     """
     Save fit-window diagnostics for best theta:
       - GT
@@ -151,6 +159,8 @@ def save_patient_fit_figures(bundle: Dict, fit_result: Dict, simulator, figures_
     for i, sess_idx in enumerate(target_indices):
         gt = gt_all[sess_idx].astype(np.uint8)
         pred_best = sim["pred_masks"][i].astype(np.uint8) if sim["success_flags"][i] else np.zeros_like(gt)
+        if allowed_growth_mask is not None and apply_growth_gate:
+            pred_best = apply_growth_gate_to_mask(pred_best, allowed_growth_mask)
         pred_base = baseline_mask
 
         best_d = float(hard_dice(pred_best, gt))

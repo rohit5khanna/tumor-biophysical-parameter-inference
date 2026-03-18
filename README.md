@@ -38,3 +38,9 @@ Notes:
 - You can switch initialization with `init_mode`:
   - `gaussian` (default TumorGrowthToolkit behavior)
   - `mask_field` (baseline mask-based initialization)
+- Optional growth-gating controls can constrain spread to fit-window regions:
+  - `growth_gate_enabled`
+  - `growth_gate_dilation`
+  - `growth_gate_apply_in_fit`
+  - `growth_gate_apply_in_eval`
+  - `growth_gate_outside_penalty`

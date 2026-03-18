@@ -8,7 +8,14 @@ from .baselines import evaluate_locf
 from .rollout import rollout_ensemble, rollout_theta
 
 
-def evaluate_patient(bundle: Dict, split: Dict, fit_result: Dict, simulator) -> Dict:
+def evaluate_patient(
+    bundle: Dict,
+    split: Dict,
+    fit_result: Dict,
+    simulator,
+    growth_gate_allowed_mask=None,
+    growth_gate_apply: bool = False,
+) -> Dict:
     eval_indices = split["eval_indices"]
     baseline_idx = split["baseline_idx"]
 
@@ -21,6 +28,8 @@ def evaluate_patient(bundle: Dict, split: Dict, fit_result: Dict, simulator) -> 
         theta=best_theta,
         baseline_idx=baseline_idx,
         target_indices=eval_indices,
+        allowed_growth_mask=growth_gate_allowed_mask,
+        apply_growth_gate=growth_gate_apply,
     )
     ensemble_eval = rollout_ensemble(
         simulator=simulator,
@@ -28,6 +37,8 @@ def evaluate_patient(bundle: Dict, split: Dict, fit_result: Dict, simulator) -> 
         thetas=top_thetas,
         baseline_idx=baseline_idx,
         target_indices=eval_indices,
+        allowed_growth_mask=growth_gate_allowed_mask,
+        apply_growth_gate=growth_gate_apply,
     )
     locf = evaluate_locf(bundle=bundle, baseline_idx=baseline_idx, target_indices=eval_indices)
 
@@ -39,4 +50,5 @@ def evaluate_patient(bundle: Dict, split: Dict, fit_result: Dict, simulator) -> 
         "ensemble_eval": ensemble_eval,
         "locf_eval": locf,
         "delta_best_vs_locf": float(best_eval["mean_dice"] - locf["mean_dice"]),
+        "growth_gate_apply_in_eval": bool(growth_gate_apply),
     }

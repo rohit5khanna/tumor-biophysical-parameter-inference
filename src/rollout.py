@@ -4,6 +4,7 @@ from typing import Dict, List
 
 import numpy as np
 
+from .growth_gate import apply_growth_gate_to_mask, outside_growth_fraction
 from .metrics import hard_dice
 
 
@@ -13,6 +14,8 @@ def rollout_theta(
     theta: Dict[str, float],
     baseline_idx: int,
     target_indices: List[int],
+    allowed_growth_mask: np.ndarray | None = None,
+    apply_growth_gate: bool = False,
 ) -> Dict:
     sim = simulator.predict_for_indices(
         bundle=bundle,
@@ -23,17 +26,40 @@ def rollout_theta(
 
     gt = bundle["label_bin"]
     dices: List[float] = []
+    outside_rates: List[float] = []
+    pred_masks: List[np.ndarray] = []
+    raw_pred_masks: List[np.ndarray] = []
     for i, idx in enumerate(target_indices):
         if not sim["success_flags"][i]:
             dices.append(0.0)
+            outside_rates.append(0.0)
+            pred_masks.append(np.zeros_like(gt[idx], dtype=np.uint8))
+            raw_pred_masks.append(np.zeros_like(gt[idx], dtype=np.uint8))
         else:
-            dices.append(float(hard_dice(sim["pred_masks"][i], gt[idx])))
+            pred_raw = sim["pred_masks"][i].astype(np.uint8)
+            raw_pred_masks.append(pred_raw)
+            if allowed_growth_mask is not None:
+                outside_rates.append(outside_growth_fraction(pred_raw, allowed_growth_mask))
+                pred_eval = (
+                    apply_growth_gate_to_mask(pred_raw, allowed_growth_mask)
+                    if apply_growth_gate
+                    else pred_raw
+                )
+            else:
+                outside_rates.append(0.0)
+                pred_eval = pred_raw
+
+            pred_masks.append(pred_eval)
+            dices.append(float(hard_dice(pred_eval, gt[idx])))
 
     return {
         "target_indices": list(target_indices),
         "dices": dices,
         "mean_dice": float(np.mean(dices)) if dices else float("nan"),
-        "pred_masks": sim["pred_masks"],
+        "outside_rates": outside_rates,
+        "mean_outside_rate": float(np.mean(outside_rates)) if outside_rates else 0.0,
+        "pred_masks": pred_masks,
+        "raw_pred_masks": raw_pred_masks,
         "success_flags": sim["success_flags"],
         "messages": sim["messages"],
     }
@@ -45,6 +71,8 @@ def rollout_ensemble(
     thetas: List[Dict[str, float]],
     baseline_idx: int,
     target_indices: List[int],
+    allowed_growth_mask: np.ndarray | None = None,
+    apply_growth_gate: bool = False,
 ) -> Dict:
     per_theta = []
     for theta in thetas:
@@ -54,6 +82,8 @@ def rollout_ensemble(
             theta=theta,
             baseline_idx=baseline_idx,
             target_indices=target_indices,
+            allowed_growth_mask=allowed_growth_mask,
+            apply_growth_gate=apply_growth_gate,
         )
         per_theta.append(out)
 

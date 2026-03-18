@@ -62,6 +62,14 @@ def main() -> None:
     print(f"  output_root: {cfg.output_root}")
     print(f"  tgtk_root: {cfg.tgtk_root}")
     print(f"  patients: {cfg.patient_ids}")
+    print(
+        "  growth_gate: "
+        f"enabled={cfg.growth_gate_enabled}, "
+        f"dilation={cfg.growth_gate_dilation}, "
+        f"fit={cfg.growth_gate_apply_in_fit}, "
+        f"eval={cfg.growth_gate_apply_in_eval}, "
+        f"outside_penalty={cfg.growth_gate_outside_penalty}"
+    )
 
     np.random.seed(cfg.seed)
     patients = load_many_patients(cfg.data_root, cfg.patient_ids)
@@ -108,18 +116,27 @@ def main() -> None:
                 seed=cfg.seed,
                 failure_loss=cfg.failure_loss,
                 seed_jitter_pct=cfg.seed_jitter_pct,
+                growth_gate_enabled=cfg.growth_gate_enabled,
+                growth_gate_dilation=cfg.growth_gate_dilation,
+                growth_gate_apply_in_fit=cfg.growth_gate_apply_in_fit,
+                growth_gate_outside_penalty=cfg.growth_gate_outside_penalty,
             )
+            allowed_growth_mask = fit_result.get("growth_gate_allowed_mask", None)
             eval_result = evaluate_patient(
                 bundle=bundle,
                 split=split,
                 fit_result=fit_result,
                 simulator=simulator,
+                growth_gate_allowed_mask=allowed_growth_mask,
+                growth_gate_apply=(cfg.growth_gate_enabled and cfg.growth_gate_apply_in_eval),
             )
             save_patient_fit_figures(
                 bundle=bundle,
                 fit_result=fit_result,
                 simulator=simulator,
                 figures_dir=Path(out["figures"]),
+                allowed_growth_mask=allowed_growth_mask,
+                apply_growth_gate=(cfg.growth_gate_enabled and cfg.growth_gate_apply_in_fit),
             )
             save_patient_eval_figures(bundle=bundle, eval_result=eval_result, figures_dir=Path(out["figures"]))
 
